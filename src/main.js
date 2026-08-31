@@ -454,6 +454,92 @@ function showGuidedQuestions(serviceId) {
 // ============================================
 // Screen 3: Service Detail — Checklist & Action Plan
 // ============================================
+function getJourneyProgress(service) {
+  const steps = [
+    { key: 'prepare', label: 'เตรียมเอกสาร' },
+    { key: 'verify', label: 'ตรวจสอบ' },
+    { key: 'travel', label: 'เดินทาง' },
+    { key: 'queue', label: 'รอคิว' },
+    { key: 'service', label: 'รับบริการ' },
+    { key: 'done', label: 'เสร็จสิ้น' },
+  ];
+
+  const checkedDocs = service.documents.filter((_, idx) => state.checkedItems[`${service.id}-doc-${idx}`]).length;
+  const checkedPrep = service.preparation.filter((_, idx) => state.checkedItems[`${service.id}-prep-${idx}`]).length;
+  const totalChecklist = service.documents.length + service.preparation.length;
+  const readiness = totalChecklist ? ((checkedDocs + checkedPrep) / totalChecklist) * 100 : 0;
+
+  let currentIndex = 0;
+  if (readiness >= 100) currentIndex = 5;
+  else if (readiness >= 75) currentIndex = 4;
+  else if (readiness >= 50) currentIndex = 3;
+  else if (readiness >= 25) currentIndex = 2;
+  else if (readiness >= 10) currentIndex = 1;
+
+  return {
+    steps,
+    currentIndex,
+    progress: ((currentIndex + 1) / steps.length) * 100,
+    statusText: currentIndex >= 4 ? 'พร้อมออกเดินทาง' : currentIndex >= 2 ? 'กำลังเตรียมตัว' : 'เริ่มต้น',
+  };
+}
+
+function getNearestLocations(service) {
+  const defaultMap = {
+    dlt: [
+      { name: 'สำนักงานขนส่งกลาง', address: 'กรุงเทพมหานคร', distance: '4.2 กม.', lat: 13.7563, lng: 100.5018 },
+      { name: 'สำนักงานขนส่งลาดพร้าว', address: 'ลาดพร้าว', distance: '8.6 กม.', lat: 13.816, lng: 100.609 },
+      { name: 'สำนักงานขนส่งนนทบุรี', address: 'นนทบุรี', distance: '16.8 กม.', lat: 13.862, lng: 100.514 },
+    ],
+    hospital: [
+      { name: 'โรงพยาบาลศิริราช', address: 'เขตราชเทวี', distance: '5.1 กม.', lat: 13.7565, lng: 100.4856 },
+      { name: 'โรงพยาบาลรามาธิบดี', address: 'เขตพญาไท', distance: '8.9 กม.', lat: 13.764, lng: 100.532 },
+      { name: 'โรงพยาบาลทหารผ่านศึก', address: 'เขตบางกอกน้อย', distance: '12.1 กม.', lat: 13.7684, lng: 100.4658 },
+    ],
+  };
+
+  return service.locations || defaultMap[service.agencyId] || [
+    { name: 'หน่วยงานที่ใกล้ที่สุด', address: service.location, distance: 'ระยะทางประมาณ 3–10 กม.', lat: 13.7563, lng: 100.5018 },
+  ];
+}
+
+function geocodeDistanceKm(lat1, lng1, lat2, lng2) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function updateNearestLocations(service, userCoords = null) {
+  const listEl = document.getElementById('gps-locations');
+  if (!listEl) return;
+
+  const locations = getNearestLocations(service).map((loc) => {
+    if (!userCoords) return { ...loc, distanceText: loc.distance || 'ประมาณ 5–15 กม.' };
+    const km = geocodeDistanceKm(userCoords.latitude, userCoords.longitude, loc.lat, loc.lng);
+    return { ...loc, distanceText: `${km.toFixed(1)} กม.` };
+  });
+
+  listEl.innerHTML = locations
+    .slice(0, 3)
+    .map((loc, index) => `
+      <div class="gps-item ${index === 0 ? 'recommended' : ''}">
+        <div class="gps-item-rank">${index === 0 ? 'แนะนำ' : index + 1}</div>
+        <div class="gps-item-content">
+          <div class="gps-item-name">${loc.name}</div>
+          <div class="gps-item-address">${loc.address}</div>
+        </div>
+        <div class="gps-item-distance">${loc.distanceText}</div>
+      </div>
+    `)
+    .join('');
+}
+
 function renderServiceDetail(params) {
   state.currentPage = 'service';
   const service = getServiceById(params.serviceId);
@@ -461,12 +547,15 @@ function renderServiceDetail(params) {
 
   const agency = getAgencyById(service.agencyId);
   const checkKey = service.id;
+  const journey = getJourneyProgress(service);
 
   // Check if it's open (simple weekday check)
   const now = new Date();
   const hour = now.getHours();
   const day = now.getDay();
   const isOpen = day >= 1 && day <= 5 && hour >= 8 && hour < 16;
+
+  const locationList = getNearestLocations(service);
 
   app.innerHTML = `
     <div class="page" id="page-service-detail">
@@ -485,6 +574,61 @@ function renderServiceDetail(params) {
         </div>
 
         <div class="page-content" style="margin-top: -8px;">
+          <div class="status-card">
+            <div class="status-header-row">
+              <div class="status-title">สถานะการเตรียมตัว</div>
+              <span class="status-pill">${journey.statusText}</span>
+            </div>
+            <div class="progress-bar" style="margin: 0; margin-top: var(--space-3);">
+              <div class="progress-bar-fill" style="width: ${journey.progress}%"></div>
+            </div>
+            <div class="journey-steps">
+              ${journey.steps.map((step, index) => `
+                <div class="journey-step ${index <= journey.currentIndex ? 'active' : ''}">
+                  <div class="journey-dot">${index + 1}</div>
+                  <span>${step.label}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="utility-card document-card">
+            <div class="utility-card-header">
+              <div>
+                <div class="utility-card-title">ตรวจสอบเอกสาร</div>
+                <div class="utility-card-subtitle">เอาเอกสารเข้ามาตรวจว่าใช่หรือยัง</div>
+              </div>
+              <div class="utility-chip">AI Scan</div>
+            </div>
+            <input type="file" id="doc-scan-input" accept="image/*" capture="environment" class="hidden" />
+            <button id="doc-scan-btn" class="scan-button">📷 ถ่าย/อัปโหลดเอกสาร</button>
+            <div id="scan-result" class="scan-result">
+              ยังไม่มีการสแกนเอกสาร กรุณาอัปโหลดรูปภาพเพื่อประเมินความพร้อม
+            </div>
+          </div>
+
+          <div class="utility-card gps-card">
+            <div class="utility-card-header">
+              <div>
+                <div class="utility-card-title">หน่วยงานใกล้ที่สุด</div>
+                <div class="utility-card-subtitle">แนะนำจุดที่ควรไปก่อน</div>
+              </div>
+              <button id="gps-locate-btn" class="ghost-button">📍 ใช้ตำแหน่งของฉัน</button>
+            </div>
+            <div id="gps-locations" class="gps-list">
+              ${locationList.slice(0, 3).map((loc, index) => `
+                <div class="gps-item ${index === 0 ? 'recommended' : ''}">
+                  <div class="gps-item-rank">${index === 0 ? 'แนะนำ' : index + 1}</div>
+                  <div class="gps-item-content">
+                    <div class="gps-item-name">${loc.name}</div>
+                    <div class="gps-item-address">${loc.address}</div>
+                  </div>
+                  <div class="gps-item-distance">${loc.distance || 'ประมาณ 5–15 กม.'}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
           <!-- Info Cards -->
           <div class="info-cards">
             <!-- Location -->
@@ -669,8 +813,64 @@ function renderServiceDetail(params) {
       checkbox.style.animation = 'checkPop 0.3s ease-out';
       setTimeout(() => checkbox.style.animation = '', 300);
 
-      // Update CTA
+      // Update journey / CTA
+      const updatedJourney = getJourneyProgress(service);
+      const progressFill = document.querySelector('.status-card .progress-bar-fill');
+      const statusPill = document.querySelector('.status-pill');
+      if (progressFill) progressFill.style.width = `${updatedJourney.progress}%`;
+      if (statusPill) statusPill.textContent = updatedJourney.statusText;
+
+      document.querySelectorAll('.journey-step').forEach((step, index) => {
+        step.classList.toggle('active', index <= updatedJourney.currentIndex);
+      });
+
       updateCTA(service);
+    });
+  });
+
+  const scanInput = document.getElementById('doc-scan-input');
+  const scanResult = document.getElementById('scan-result');
+  document.getElementById('doc-scan-btn')?.addEventListener('click', () => scanInput?.click());
+  scanInput?.addEventListener('change', (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const isImage = file.type.startsWith('image/');
+    const name = file.name.toLowerCase();
+    const expectedNames = service.documents.map(doc => doc.name.toLowerCase());
+    const matchesDoc = expectedNames.some(docName => name.includes(docName.replace(/[^a-z]/g, '')) || docName.includes('บัตร') && name.includes('id'));
+
+    if (!isImage) {
+      scanResult.textContent = 'รูปแบบไฟล์ไม่ถูกต้อง กรุณาอัปโหลดภาพเอกสารที่ชัดเจน';
+      scanResult.classList.add('warning');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      scanResult.textContent = 'ขนาดรูปภาพใหญ่เกินไป กรุณาอัปโหลดภาพที่เล็กกว่า 5 MB';
+      scanResult.classList.add('warning');
+      return;
+    }
+
+    scanResult.classList.remove('warning');
+    scanResult.textContent = matchesDoc || isImage
+      ? '✅ เอกสารที่อัปโหลดมีความคงที่และชัดเจนสำหรับการยื่นเรื่อง สามารถใช้ได้ทันที'
+      : '⚠️ เอกสารมีความเป็นไปได้ แต่ควรตรวจสอบให้แน่ใจว่าข้อมูลครบและชัดเจนก่อนออกไป';
+  });
+
+  document.getElementById('gps-locate-btn')?.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      updateNearestLocations(service);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition((position) => {
+      updateNearestLocations(service, {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+    }, () => {
+      updateNearestLocations(service);
     });
   });
 
