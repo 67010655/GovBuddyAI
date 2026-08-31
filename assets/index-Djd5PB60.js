@@ -42,10 +42,23 @@
         <!-- Search Results (hidden by default) -->
         <div id="search-results" class="hidden" style="margin-bottom: var(--space-6);"></div>
 
+        <div class="onboarding-card">
+          <div class="onboarding-header">
+            <div class="onboarding-label">3 ขั้นตอนง่าย ๆ</div>
+            <button class="text-button" id="home-quick-ai">ขอแนะนำ</button>
+          </div>
+          <div class="onboarding-steps">
+            <div class="step-pill"><span>1</span> เลือกหน่วยงาน</div>
+            <div class="step-pill"><span>2</span> เลือกบริการ</div>
+            <div class="step-pill"><span>3</span> เตรียมเอกสาร</div>
+          </div>
+          <button class="cta-button" id="start-journey-btn">เริ่มทำเรื่อง</button>
+        </div>
+
         <!-- Categories -->
         <div id="categories-section">
           <div class="section-title">
-            <span>หมวดหมู่หน่วยงาน</span>
+            <span>เลือกหน่วยงานจากหมวดหมู่</span>
           </div>
           <div class="category-grid">
             ${a.map(e=>`
@@ -93,7 +106,7 @@
 
       ${g(`home`)}
     </div>
-  `,_(),document.querySelectorAll(`.agency-card`).forEach(e=>{e.addEventListener(`click`,()=>{n(`/agency`,{agencyId:e.dataset.agency})})}),document.querySelectorAll(`.category-item:not(.disabled)`).forEach(e=>{e.addEventListener(`click`,()=>{let t=e.dataset.category,r=o.find(e=>e.categoryId===t);r&&n(`/agency`,{agencyId:r.id})})}),document.getElementById(`home-chat-btn`)?.addEventListener(`click`,()=>n(`/chat`)),document.getElementById(`home-ai-btn`)?.addEventListener(`click`,()=>n(`/chat`));let e=document.getElementById(`search-input`),t=document.getElementById(`search-results`),r=document.getElementById(`categories-section`),i=document.getElementById(`agencies-section`);e?.addEventListener(`input`,e=>{let a=e.target.value.trim();if(a.length===0){t.classList.add(`hidden`),r.classList.remove(`hidden`),i.classList.remove(`hidden`);return}r.classList.add(`hidden`),i.classList.add(`hidden`),t.classList.remove(`hidden`);let s=o.filter(e=>e.name.includes(a)||e.shortName.includes(a)||e.description.includes(a)),c=Object.values(d(`dlt`)).concat(Object.values(d(`hospital`))).filter(e=>e.name.includes(a)||e.description.includes(a)),l=``;s.length>0&&(l+=`<div class="section-title">หน่วยงาน</div><div class="agency-list" style="margin-bottom: var(--space-4);">`,s.forEach(e=>{l+=`
+  `,_(),document.querySelectorAll(`.agency-card`).forEach(e=>{e.addEventListener(`click`,()=>{n(`/agency`,{agencyId:e.dataset.agency})})}),document.querySelectorAll(`.category-item:not(.disabled)`).forEach(e=>{e.addEventListener(`click`,()=>{let t=e.dataset.category,r=o.find(e=>e.categoryId===t);r&&n(`/agency`,{agencyId:r.id})})}),document.getElementById(`home-chat-btn`)?.addEventListener(`click`,()=>n(`/chat`)),document.getElementById(`home-ai-btn`)?.addEventListener(`click`,()=>n(`/chat`)),document.getElementById(`home-quick-ai`)?.addEventListener(`click`,()=>n(`/chat`)),document.getElementById(`start-journey-btn`)?.addEventListener(`click`,()=>{let e=o[0];e?n(`/agency`,{agencyId:e.id}):n(`/chat`)});let e=document.getElementById(`search-input`),t=document.getElementById(`search-results`),r=document.getElementById(`categories-section`),i=document.getElementById(`agencies-section`);e?.addEventListener(`input`,e=>{let a=e.target.value.trim();if(a.length===0){t.classList.add(`hidden`),r.classList.remove(`hidden`),i.classList.remove(`hidden`);return}r.classList.add(`hidden`),i.classList.add(`hidden`),t.classList.remove(`hidden`);let s=o.filter(e=>e.name.includes(a)||e.shortName.includes(a)||e.description.includes(a)),c=Object.values(d(`dlt`)).concat(Object.values(d(`hospital`))).filter(e=>e.name.includes(a)||e.description.includes(a)),l=``;s.length>0&&(l+=`<div class="section-title">หน่วยงาน</div><div class="agency-list" style="margin-bottom: var(--space-4);">`,s.forEach(e=>{l+=`
           <div class="agency-card" data-agency="${e.id}">
             <div class="agency-card-icon" style="background: ${e.bgColor}">${e.icon}</div>
             <div class="agency-card-info">
