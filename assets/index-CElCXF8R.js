@@ -26,7 +26,7 @@
             <div class="home-logo-icon">${m.sparkle}</div>
             <span class="home-logo-text">GovBuddy AI</span>
           </div>
-          <button class="header-action" id="home-chat-btn" style="color: rgba(255,255,255,0.8)">
+          <button class="header-action" id="home-chat-btn" style="color: var(--color-primary); background: var(--color-primary-light);">
             ${m.chat}
           </button>
         </div>
