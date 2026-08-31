@@ -44,13 +44,22 @@
 
         <div class="onboarding-card">
           <div class="onboarding-header">
-            <div class="onboarding-label">3 ขั้นตอนง่าย ๆ</div>
-            <button class="text-button" id="home-quick-ai">ขอแนะนำ</button>
+            <div class="onboarding-label">เริ่มจากเรื่องที่คุณต้องทำ</div>
+            <button class="text-button" id="home-quick-ai">ช่วยแนะนำ</button>
           </div>
-          <div class="onboarding-steps">
-            <div class="step-pill"><span>1</span> เลือกหน่วยงาน</div>
-            <div class="step-pill"><span>2</span> เลือกบริการ</div>
-            <div class="step-pill"><span>3</span> เตรียมเอกสาร</div>
+          <div class="quick-goal-list">
+            <button class="quick-goal-item" data-purpose="dlt-new-license">
+              <span class="quick-goal-icon">🪪</span>
+              <span>ทำใบขับขี่ใหม่</span>
+            </button>
+            <button class="quick-goal-item" data-purpose="dlt-renew-license">
+              <span class="quick-goal-icon">🔄</span>
+              <span>ต่ออายุใบขับขี่</span>
+            </button>
+            <button class="quick-goal-item" data-purpose="hospital">
+              <span class="quick-goal-icon">🏥</span>
+              <span>ไปโรงพยาบาล</span>
+            </button>
           </div>
           <button class="cta-button" id="start-journey-btn">เริ่มทำเรื่อง</button>
         </div>
@@ -58,7 +67,7 @@
         <!-- Categories -->
         <div id="categories-section">
           <div class="section-title">
-            <span>เลือกหน่วยงานจากหมวดหมู่</span>
+            <span>เลือกหน่วยงาน</span>
           </div>
           <div class="category-grid">
             ${a.map(e=>`
@@ -106,7 +115,7 @@
 
       ${g(`home`)}
     </div>
-  `,_(),document.querySelectorAll(`.agency-card`).forEach(e=>{e.addEventListener(`click`,()=>{n(`/agency`,{agencyId:e.dataset.agency})})}),document.querySelectorAll(`.category-item:not(.disabled)`).forEach(e=>{e.addEventListener(`click`,()=>{let t=e.dataset.category,r=o.find(e=>e.categoryId===t);r&&n(`/agency`,{agencyId:r.id})})}),document.getElementById(`home-chat-btn`)?.addEventListener(`click`,()=>n(`/chat`)),document.getElementById(`home-ai-btn`)?.addEventListener(`click`,()=>n(`/chat`)),document.getElementById(`home-quick-ai`)?.addEventListener(`click`,()=>n(`/chat`)),document.getElementById(`start-journey-btn`)?.addEventListener(`click`,()=>{let e=o[0];e?n(`/agency`,{agencyId:e.id}):n(`/chat`)});let e=document.getElementById(`search-input`),t=document.getElementById(`search-results`),r=document.getElementById(`categories-section`),i=document.getElementById(`agencies-section`);e?.addEventListener(`input`,e=>{let a=e.target.value.trim();if(a.length===0){t.classList.add(`hidden`),r.classList.remove(`hidden`),i.classList.remove(`hidden`);return}r.classList.add(`hidden`),i.classList.add(`hidden`),t.classList.remove(`hidden`);let s=o.filter(e=>e.name.includes(a)||e.shortName.includes(a)||e.description.includes(a)),c=Object.values(d(`dlt`)).concat(Object.values(d(`hospital`))).filter(e=>e.name.includes(a)||e.description.includes(a)),l=``;s.length>0&&(l+=`<div class="section-title">หน่วยงาน</div><div class="agency-list" style="margin-bottom: var(--space-4);">`,s.forEach(e=>{l+=`
+  `,_(),document.querySelectorAll(`.agency-card`).forEach(e=>{e.addEventListener(`click`,()=>{n(`/agency`,{agencyId:e.dataset.agency})})}),document.querySelectorAll(`.category-item:not(.disabled)`).forEach(e=>{e.addEventListener(`click`,()=>{let t=e.dataset.category,r=o.find(e=>e.categoryId===t);r&&n(`/agency`,{agencyId:r.id})})}),document.getElementById(`home-chat-btn`)?.addEventListener(`click`,()=>n(`/chat`)),document.getElementById(`home-ai-btn`)?.addEventListener(`click`,()=>n(`/chat`)),document.getElementById(`home-quick-ai`)?.addEventListener(`click`,()=>n(`/chat`)),document.querySelectorAll(`.quick-goal-item`).forEach(e=>{e.addEventListener(`click`,()=>{let t=e.dataset.purpose;t===`hospital`?n(`/agency`,{agencyId:`hospital`}):n(`/service`,{serviceId:t})})}),document.getElementById(`start-journey-btn`)?.addEventListener(`click`,()=>{let e=o[0];e?n(`/agency`,{agencyId:e.id}):n(`/chat`)});let e=document.getElementById(`search-input`),t=document.getElementById(`search-results`),r=document.getElementById(`categories-section`),i=document.getElementById(`agencies-section`);e?.addEventListener(`input`,e=>{let a=e.target.value.trim();if(a.length===0){t.classList.add(`hidden`),r.classList.remove(`hidden`),i.classList.remove(`hidden`);return}r.classList.add(`hidden`),i.classList.add(`hidden`),t.classList.remove(`hidden`);let s=o.filter(e=>e.name.includes(a)||e.shortName.includes(a)||e.description.includes(a)),c=Object.values(d(`dlt`)).concat(Object.values(d(`hospital`))).filter(e=>e.name.includes(a)||e.description.includes(a)),l=``;s.length>0&&(l+=`<div class="section-title">หน่วยงาน</div><div class="agency-list" style="margin-bottom: var(--space-4);">`,s.forEach(e=>{l+=`
           <div class="agency-card" data-agency="${e.id}">
             <div class="agency-card-icon" style="background: ${e.bgColor}">${e.icon}</div>
             <div class="agency-card-info">
@@ -236,6 +245,15 @@
         </div>
 
         <div class="page-content" style="margin-top: -8px;">
+          <div class="service-summary-card">
+            <div class="service-summary-label">ก่อนออกไป</div>
+            <div class="service-summary-grid">
+              <div><span>1</span> จองคิว/ตรวจสอบเวลา</div>
+              <div><span>2</span> เตรียมเอกสารตามเช็กลิสต์</div>
+              <div><span>3</span> ไปถึงก่อนเวลานัด 30 นาที</div>
+            </div>
+          </div>
+
           <div class="status-card">
             <div class="status-header-row">
               <div class="status-title">สถานะการเตรียมตัว</div>
