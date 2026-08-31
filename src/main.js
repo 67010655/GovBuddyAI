@@ -90,7 +90,7 @@ function renderHome() {
             <div class="home-logo-icon">${icons.sparkle}</div>
             <span class="home-logo-text">GovBuddy AI</span>
           </div>
-          <button class="header-action" id="home-chat-btn" style="color: rgba(255,255,255,0.8)">
+          <button class="header-action" id="home-chat-btn" style="color: var(--color-primary); background: var(--color-primary-light);">
             ${icons.chat}
           </button>
         </div>
@@ -106,10 +106,32 @@ function renderHome() {
         <!-- Search Results (hidden by default) -->
         <div id="search-results" class="hidden" style="margin-bottom: var(--space-6);"></div>
 
+        <div class="onboarding-card">
+          <div class="onboarding-header">
+            <div class="onboarding-label">เริ่มจากเรื่องที่คุณต้องทำ</div>
+            <button class="text-button" id="home-quick-ai">ช่วยแนะนำ</button>
+          </div>
+          <div class="quick-goal-list">
+            <button class="quick-goal-item" data-purpose="dlt-new-license">
+              <span class="quick-goal-icon">🪪</span>
+              <span>ทำใบขับขี่ใหม่</span>
+            </button>
+            <button class="quick-goal-item" data-purpose="dlt-renew-license">
+              <span class="quick-goal-icon">🔄</span>
+              <span>ต่ออายุใบขับขี่</span>
+            </button>
+            <button class="quick-goal-item" data-purpose="hospital">
+              <span class="quick-goal-icon">🏥</span>
+              <span>ไปโรงพยาบาล</span>
+            </button>
+          </div>
+          <button class="cta-button" id="start-journey-btn">เริ่มทำเรื่อง</button>
+        </div>
+
         <!-- Categories -->
         <div id="categories-section">
           <div class="section-title">
-            <span>หมวดหมู่หน่วยงาน</span>
+            <span>เลือกหน่วยงาน</span>
           </div>
           <div class="category-grid">
             ${categories.map(cat => `
@@ -182,6 +204,25 @@ function renderHome() {
   // Chat buttons
   document.getElementById('home-chat-btn')?.addEventListener('click', () => navigate('/chat'));
   document.getElementById('home-ai-btn')?.addEventListener('click', () => navigate('/chat'));
+  document.getElementById('home-quick-ai')?.addEventListener('click', () => navigate('/chat'));
+  document.querySelectorAll('.quick-goal-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const purpose = btn.dataset.purpose;
+      if (purpose === 'hospital') {
+        navigate('/agency', { agencyId: 'hospital' });
+      } else {
+        navigate('/service', { serviceId: purpose });
+      }
+    });
+  });
+  document.getElementById('start-journey-btn')?.addEventListener('click', () => {
+    const firstAgency = agencies[0];
+    if (firstAgency) {
+      navigate('/agency', { agencyId: firstAgency.id });
+    } else {
+      navigate('/chat');
+    }
+  });
 
   // Search
   const searchInput = document.getElementById('search-input');
@@ -503,6 +544,47 @@ function getNearestLocations(service) {
   ];
 }
 
+function evaluateDocumentScan(service, fileName, fileSize) {
+  const normalizedName = fileName.toLowerCase();
+  const requirementNames = service.documents.map(doc => doc.name.toLowerCase().replace(/[^a-z]/g, ''));
+  const matchCount = requirementNames.filter(name => normalizedName.includes(name)).length;
+  const sizeOk = fileSize <= 5 * 1024 * 1024;
+
+  if (!sizeOk) {
+    return {
+      status: 'ไฟล์ใหญ่เกินไป',
+      tone: 'warning',
+      message: 'ขนาดไฟล์เกิน 5 MB ควรลดขนาดรูปก่อนยื่นเอกสาร',
+      score: 35,
+    };
+  }
+
+  if (matchCount === 0) {
+    return {
+      status: 'ตรวจสอบอีกครั้ง',
+      tone: 'warning',
+      message: 'ยังไม่พบภาพเอกสารที่สอดคล้องกับรายการที่ต้องใช้ ควรตรวจสอบชื่อไฟล์หรือรูปภาพอีกครั้ง',
+      score: 45,
+    };
+  }
+
+  if (matchCount >= Math.min(2, requirementNames.length)) {
+    return {
+      status: 'เอกสารผ่าน',
+      tone: 'success',
+      message: 'รูปภาพมีความชัดเจนและสอดคล้องกับเอกสารที่ต้องใช้สำหรับบริการนี้',
+      score: 92,
+    };
+  }
+
+  return {
+    status: 'ควรตรวจสอบ',
+    tone: 'warning',
+    message: 'เอกสารมีความเป็นไปได้ แต่ควรแน่ใจว่าข้อมูลและภาพมีความชัดเจนก่อนออกไป',
+    score: 68,
+  };
+}
+
 function geocodeDistanceKm(lat1, lng1, lat2, lng2) {
   const toRad = (value) => (value * Math.PI) / 180;
   const R = 6371;
@@ -566,14 +648,33 @@ function renderServiceDetail(params) {
       </header>
 
       <div class="page-scroll">
-        <!-- Hero -->
         <div class="detail-hero">
-          <div style="font-size: 36px; margin-bottom: var(--space-3);">${service.icon}</div>
-          <h2 class="detail-hero-title">${service.name}</h2>
-          <p class="detail-hero-subtitle">${service.description}</p>
+          <div class="detail-hero-badge">บริการที่เลือก</div>
+          <div class="detail-hero-row">
+            <div class="detail-hero-icon">${service.icon}</div>
+            <div>
+              <h2 class="detail-hero-title">${service.name}</h2>
+              <p class="detail-hero-subtitle">${service.description}</p>
+            </div>
+          </div>
         </div>
 
         <div class="page-content" style="margin-top: -8px;">
+          <div class="meta-chip-row">
+            <div class="meta-chip">📍 ${service.location}</div>
+            <div class="meta-chip">💰 ${service.estimatedCost}</div>
+            <div class="meta-chip">⏱ ${service.estimatedTime}</div>
+          </div>
+
+          <div class="service-summary-card">
+            <div class="service-summary-label">ก่อนออกไป</div>
+            <div class="service-summary-grid">
+              <div><span>1</span> ตรวจสอบเวลาและจองคิว</div>
+              <div><span>2</span> เตรียมเอกสารตามเช็กลิสต์</div>
+              <div><span>3</span> ไปถึงก่อนเวลานัด 30 นาที</div>
+            </div>
+          </div>
+
           <div class="status-card">
             <div class="status-header-row">
               <div class="status-title">สถานะการเตรียมตัว</div>
@@ -596,7 +697,7 @@ function renderServiceDetail(params) {
             <div class="utility-card-header">
               <div>
                 <div class="utility-card-title">ตรวจสอบเอกสาร</div>
-                <div class="utility-card-subtitle">เอาเอกสารเข้ามาตรวจว่าใช่หรือยัง</div>
+                <div class="utility-card-subtitle">อัปโหลดรูปเพื่อให้ระบบประเมินความพร้อม</div>
               </div>
               <div class="utility-chip">AI Scan</div>
             </div>
@@ -610,64 +711,22 @@ function renderServiceDetail(params) {
           <div class="utility-card gps-card">
             <div class="utility-card-header">
               <div>
-                <div class="utility-card-title">หน่วยงานใกล้ที่สุด</div>
-                <div class="utility-card-subtitle">แนะนำจุดที่ควรไปก่อน</div>
+                <div class="utility-card-title">จุดที่ควรไปก่อน</div>
+                <div class="utility-card-subtitle">หน่วยงานที่ใกล้และสะดวกที่สุด</div>
               </div>
-              <button id="gps-locate-btn" class="ghost-button">📍 ใช้ตำแหน่งของฉัน</button>
+              <button id="gps-locate-btn" class="ghost-button">📍 ตำแหน่งของฉัน</button>
             </div>
             <div id="gps-locations" class="gps-list">
-              ${locationList.slice(0, 3).map((loc, index) => `
+              ${locationList.slice(0, 2).map((loc, index) => `
                 <div class="gps-item ${index === 0 ? 'recommended' : ''}">
                   <div class="gps-item-rank">${index === 0 ? 'แนะนำ' : index + 1}</div>
                   <div class="gps-item-content">
                     <div class="gps-item-name">${loc.name}</div>
                     <div class="gps-item-address">${loc.address}</div>
                   </div>
-                  <div class="gps-item-distance">${loc.distance || 'ประมาณ 5–15 กม.'}</div>
+                  <div class="gps-item-distance">${loc.distance || '5–15 กม.'}</div>
                 </div>
               `).join('')}
-            </div>
-          </div>
-
-          <!-- Info Cards -->
-          <div class="info-cards">
-            <!-- Location -->
-            <div class="info-card">
-              <div class="info-card-icon" style="background: var(--color-accent-light); color: var(--color-accent);">
-                ${icons.location}
-              </div>
-              <div class="info-card-content">
-                <div class="info-card-label">สถานที่</div>
-                <div class="info-card-value">${service.location}</div>
-                ${service.locationNote ? `<div class="info-card-note">${service.locationNote}</div>` : ''}
-              </div>
-              <span class="info-card-badge ${isOpen ? 'badge-open' : 'badge-closed'}">${isOpen ? 'เปิดอยู่' : 'ปิดแล้ว'}</span>
-            </div>
-
-            <!-- Cost -->
-            <div class="info-card">
-              <div class="info-card-icon" style="background: var(--color-success-light); color: var(--color-success);">
-                ${icons.money}
-              </div>
-              <div class="info-card-content">
-                <div class="info-card-label">ค่าใช้จ่าย</div>
-                <div class="info-card-value">${service.estimatedCost}</div>
-                ${service.costBreakdown ? `
-                  <div class="info-card-note">${service.costBreakdown.map(c => `${c.item}: ${c.amount}`).join(' | ')}</div>
-                ` : ''}
-              </div>
-            </div>
-
-            <!-- Time -->
-            <div class="info-card">
-              <div class="info-card-icon" style="background: var(--color-warning-light); color: var(--color-warning);">
-                ${icons.clock}
-              </div>
-              <div class="info-card-content">
-                <div class="info-card-label">เวลาดำเนินการ</div>
-                <div class="info-card-value">${service.estimatedTime}</div>
-                <div class="info-card-note">${service.operatingHours}</div>
-              </div>
             </div>
           </div>
 
@@ -836,26 +895,22 @@ function renderServiceDetail(params) {
     if (!file) return;
 
     const isImage = file.type.startsWith('image/');
-    const name = file.name.toLowerCase();
-    const expectedNames = service.documents.map(doc => doc.name.toLowerCase());
-    const matchesDoc = expectedNames.some(docName => name.includes(docName.replace(/[^a-z]/g, '')) || docName.includes('บัตร') && name.includes('id'));
-
     if (!isImage) {
-      scanResult.textContent = 'รูปแบบไฟล์ไม่ถูกต้อง กรุณาอัปโหลดภาพเอกสารที่ชัดเจน';
-      scanResult.classList.add('warning');
+      scanResult.className = 'scan-result warning';
+      scanResult.innerHTML = '<strong>รูปแบบไฟล์ไม่ถูกต้อง</strong><br>กรุณาอัปโหลดภาพเอกสารที่ชัดเจน';
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      scanResult.textContent = 'ขนาดรูปภาพใหญ่เกินไป กรุณาอัปโหลดภาพที่เล็กกว่า 5 MB';
-      scanResult.classList.add('warning');
-      return;
-    }
-
-    scanResult.classList.remove('warning');
-    scanResult.textContent = matchesDoc || isImage
-      ? '✅ เอกสารที่อัปโหลดมีความคงที่และชัดเจนสำหรับการยื่นเรื่อง สามารถใช้ได้ทันที'
-      : '⚠️ เอกสารมีความเป็นไปได้ แต่ควรตรวจสอบให้แน่ใจว่าข้อมูลครบและชัดเจนก่อนออกไป';
+    const result = evaluateDocumentScan(service, file.name, file.size);
+    const statusClass = result.tone === 'success' ? 'success' : result.tone === 'warning' ? 'warning' : 'neutral';
+    scanResult.className = `scan-result ${statusClass}`;
+    scanResult.innerHTML = `
+      <div class="scan-result-top">
+        <span class="scan-pill ${result.tone}">${result.status}</span>
+        <span class="scan-score">${result.score}%</span>
+      </div>
+      <div class="scan-result-message">${result.message}</div>
+    `;
   });
 
   document.getElementById('gps-locate-btn')?.addEventListener('click', () => {
