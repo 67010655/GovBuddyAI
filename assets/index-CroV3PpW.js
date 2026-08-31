@@ -220,7 +220,7 @@
         </div>
         <div class="gps-item-distance">${e.distanceText}</div>
       </div>
-    `).join(``))}function T(e){f.currentPage=`service`;let t=u(e.serviceId);if(!t)return n(`/`);l(t.agencyId);let r=t.id,i=x(t),a=new Date,o=a.getHours(),s=a.getDay(),c=s>=1&&s<=5&&o>=8&&o<16,d=S(t);h.innerHTML=`
+    `).join(``))}function T(e){f.currentPage=`service`;let t=u(e.serviceId);if(!t)return n(`/`);l(t.agencyId);let r=t.id,i=x(t),a=new Date;a.getHours(),a.getDay();let o=S(t);h.innerHTML=`
     <div class="page" id="page-service-detail">
       <header class="header">
         <button class="header-back" id="detail-back">${m.back}</button>
@@ -229,7 +229,6 @@
       </header>
 
       <div class="page-scroll">
-        <!-- Hero -->
         <div class="detail-hero">
           <div style="font-size: 36px; margin-bottom: var(--space-3);">${t.icon}</div>
           <h2 class="detail-hero-title">${t.name}</h2>
@@ -255,11 +254,26 @@
             </div>
           </div>
 
+          <div class="mini-metrics">
+            <div class="mini-metric">
+              <span class="mini-metric-label">สถานที่</span>
+              <strong>${t.location}</strong>
+            </div>
+            <div class="mini-metric">
+              <span class="mini-metric-label">ค่าใช้จ่าย</span>
+              <strong>${t.estimatedCost}</strong>
+            </div>
+            <div class="mini-metric">
+              <span class="mini-metric-label">เวลา</span>
+              <strong>${t.estimatedTime}</strong>
+            </div>
+          </div>
+
           <div class="utility-card document-card">
             <div class="utility-card-header">
               <div>
                 <div class="utility-card-title">ตรวจสอบเอกสาร</div>
-                <div class="utility-card-subtitle">เอาเอกสารเข้ามาตรวจว่าใช่หรือยัง</div>
+                <div class="utility-card-subtitle">อัปโหลดรูปเพื่อให้ระบบประเมินความพร้อม</div>
               </div>
               <div class="utility-chip">AI Scan</div>
             </div>
@@ -273,64 +287,22 @@
           <div class="utility-card gps-card">
             <div class="utility-card-header">
               <div>
-                <div class="utility-card-title">หน่วยงานใกล้ที่สุด</div>
-                <div class="utility-card-subtitle">แนะนำจุดที่ควรไปก่อน</div>
+                <div class="utility-card-title">จุดที่ควรไปก่อน</div>
+                <div class="utility-card-subtitle">หน่วยงานที่ใกล้และสะดวกที่สุด</div>
               </div>
-              <button id="gps-locate-btn" class="ghost-button">📍 ใช้ตำแหน่งของฉัน</button>
+              <button id="gps-locate-btn" class="ghost-button">📍 ตำแหน่งของฉัน</button>
             </div>
             <div id="gps-locations" class="gps-list">
-              ${d.slice(0,3).map((e,t)=>`
+              ${o.slice(0,2).map((e,t)=>`
                 <div class="gps-item ${t===0?`recommended`:``}">
                   <div class="gps-item-rank">${t===0?`แนะนำ`:t+1}</div>
                   <div class="gps-item-content">
                     <div class="gps-item-name">${e.name}</div>
                     <div class="gps-item-address">${e.address}</div>
                   </div>
-                  <div class="gps-item-distance">${e.distance||`ประมาณ 5–15 กม.`}</div>
+                  <div class="gps-item-distance">${e.distance||`5–15 กม.`}</div>
                 </div>
               `).join(``)}
-            </div>
-          </div>
-
-          <!-- Info Cards -->
-          <div class="info-cards">
-            <!-- Location -->
-            <div class="info-card">
-              <div class="info-card-icon" style="background: var(--color-accent-light); color: var(--color-accent);">
-                ${m.location}
-              </div>
-              <div class="info-card-content">
-                <div class="info-card-label">สถานที่</div>
-                <div class="info-card-value">${t.location}</div>
-                ${t.locationNote?`<div class="info-card-note">${t.locationNote}</div>`:``}
-              </div>
-              <span class="info-card-badge ${c?`badge-open`:`badge-closed`}">${c?`เปิดอยู่`:`ปิดแล้ว`}</span>
-            </div>
-
-            <!-- Cost -->
-            <div class="info-card">
-              <div class="info-card-icon" style="background: var(--color-success-light); color: var(--color-success);">
-                ${m.money}
-              </div>
-              <div class="info-card-content">
-                <div class="info-card-label">ค่าใช้จ่าย</div>
-                <div class="info-card-value">${t.estimatedCost}</div>
-                ${t.costBreakdown?`
-                  <div class="info-card-note">${t.costBreakdown.map(e=>`${e.item}: ${e.amount}`).join(` | `)}</div>
-                `:``}
-              </div>
-            </div>
-
-            <!-- Time -->
-            <div class="info-card">
-              <div class="info-card-icon" style="background: var(--color-warning-light); color: var(--color-warning);">
-                ${m.clock}
-              </div>
-              <div class="info-card-content">
-                <div class="info-card-label">เวลาดำเนินการ</div>
-                <div class="info-card-value">${t.estimatedTime}</div>
-                <div class="info-card-note">${t.operatingHours}</div>
-              </div>
             </div>
           </div>
 
@@ -437,7 +409,7 @@
 
       ${g(`home`)}
     </div>
-  `,_(),document.getElementById(`detail-back`)?.addEventListener(`click`,()=>{n(`/agency`,{agencyId:t.agencyId})}),document.getElementById(`detail-chat-btn`)?.addEventListener(`click`,()=>{n(`/chat`,{serviceId:t.id})}),document.querySelectorAll(`.checklist-item`).forEach(e=>{e.addEventListener(`click`,n=>{if(n.target.closest(`a`))return;let r=e.dataset.key;f.checkedItems[r]=!f.checkedItems[r],p(),e.classList.toggle(`checked`);let i=e.querySelector(`.checklist-checkbox`);i.style.animation=`checkPop 0.3s ease-out`,setTimeout(()=>i.style.animation=``,300);let a=x(t),o=document.querySelector(`.status-card .progress-bar-fill`),s=document.querySelector(`.status-pill`);o&&(o.style.width=`${a.progress}%`),s&&(s.textContent=a.statusText),document.querySelectorAll(`.journey-step`).forEach((e,t)=>{e.classList.toggle(`active`,t<=a.currentIndex)}),E(t)})});let v=document.getElementById(`doc-scan-input`),y=document.getElementById(`scan-result`);document.getElementById(`doc-scan-btn`)?.addEventListener(`click`,()=>v?.click()),v?.addEventListener(`change`,e=>{let n=e.target.files?.[0];if(!n)return;let r=n.type.startsWith(`image/`),i=n.name.toLowerCase(),a=t.documents.map(e=>e.name.toLowerCase()).some(e=>i.includes(e.replace(/[^a-z]/g,``))||e.includes(`บัตร`)&&i.includes(`id`));if(!r){y.textContent=`รูปแบบไฟล์ไม่ถูกต้อง กรุณาอัปโหลดภาพเอกสารที่ชัดเจน`,y.classList.add(`warning`);return}if(n.size>5242880){y.textContent=`ขนาดรูปภาพใหญ่เกินไป กรุณาอัปโหลดภาพที่เล็กกว่า 5 MB`,y.classList.add(`warning`);return}y.classList.remove(`warning`),y.textContent=a||r?`✅ เอกสารที่อัปโหลดมีความคงที่และชัดเจนสำหรับการยื่นเรื่อง สามารถใช้ได้ทันที`:`⚠️ เอกสารมีความเป็นไปได้ แต่ควรตรวจสอบให้แน่ใจว่าข้อมูลครบและชัดเจนก่อนออกไป`}),document.getElementById(`gps-locate-btn`)?.addEventListener(`click`,()=>{if(!navigator.geolocation){w(t);return}navigator.geolocation.getCurrentPosition(e=>{w(t,{latitude:e.coords.latitude,longitude:e.coords.longitude})},()=>{w(t)})}),document.getElementById(`cta-ready`)?.addEventListener(`click`,()=>{let e=document.getElementById(`cta-ready`);e.classList.add(`success`),e.innerHTML=`🎉 บันทึกแล้ว! พร้อมไปติดต่อ`,e.style.pointerEvents=`none`,setTimeout(()=>{n(`/chat`,{serviceId:t.id,autoMessage:`ฉันเตรียมเอกสารเรียบร้อยแล้ว มีอะไรที่ต้องรู้เพิ่มเติมไหม?`})},1500)}),E(t)}function E(e){let t=(e.documents?.length||0)+(e.preparation?.length||0),n=[...document.querySelectorAll(`.checklist-item.checked`)].length,r=document.getElementById(`cta-ready`);r&&!r.classList.contains(`success`)&&(n===t&&t>0?(r.innerHTML=`🎉 เตรียมครบแล้ว! ไปต่อเลย`,r.classList.add(`success`)):r.innerHTML=`✅ ฉันเตรียมพร้อมแล้ว (${n}/${t})`)}function D(e={}){f.currentPage=`chat`;let t=e.serviceId,r=e.agencyId,i=t?u(t):null,a=r?l(r):null,o=`สวัสดีค่ะ! 😊 ยินดีต้อนรับสู่ GovBuddy AI
+  `,_(),document.getElementById(`detail-back`)?.addEventListener(`click`,()=>{n(`/agency`,{agencyId:t.agencyId})}),document.getElementById(`detail-chat-btn`)?.addEventListener(`click`,()=>{n(`/chat`,{serviceId:t.id})}),document.querySelectorAll(`.checklist-item`).forEach(e=>{e.addEventListener(`click`,n=>{if(n.target.closest(`a`))return;let r=e.dataset.key;f.checkedItems[r]=!f.checkedItems[r],p(),e.classList.toggle(`checked`);let i=e.querySelector(`.checklist-checkbox`);i.style.animation=`checkPop 0.3s ease-out`,setTimeout(()=>i.style.animation=``,300);let a=x(t),o=document.querySelector(`.status-card .progress-bar-fill`),s=document.querySelector(`.status-pill`);o&&(o.style.width=`${a.progress}%`),s&&(s.textContent=a.statusText),document.querySelectorAll(`.journey-step`).forEach((e,t)=>{e.classList.toggle(`active`,t<=a.currentIndex)}),E(t)})});let s=document.getElementById(`doc-scan-input`),c=document.getElementById(`scan-result`);document.getElementById(`doc-scan-btn`)?.addEventListener(`click`,()=>s?.click()),s?.addEventListener(`change`,e=>{let n=e.target.files?.[0];if(!n)return;let r=n.type.startsWith(`image/`),i=n.name.toLowerCase(),a=t.documents.map(e=>e.name.toLowerCase()).some(e=>i.includes(e.replace(/[^a-z]/g,``))||e.includes(`บัตร`)&&i.includes(`id`));if(!r){c.textContent=`รูปแบบไฟล์ไม่ถูกต้อง กรุณาอัปโหลดภาพเอกสารที่ชัดเจน`,c.classList.add(`warning`);return}if(n.size>5242880){c.textContent=`ขนาดรูปภาพใหญ่เกินไป กรุณาอัปโหลดภาพที่เล็กกว่า 5 MB`,c.classList.add(`warning`);return}c.classList.remove(`warning`),c.textContent=a||r?`✅ เอกสารที่อัปโหลดมีความคงที่และชัดเจนสำหรับการยื่นเรื่อง สามารถใช้ได้ทันที`:`⚠️ เอกสารมีความเป็นไปได้ แต่ควรตรวจสอบให้แน่ใจว่าข้อมูลครบและชัดเจนก่อนออกไป`}),document.getElementById(`gps-locate-btn`)?.addEventListener(`click`,()=>{if(!navigator.geolocation){w(t);return}navigator.geolocation.getCurrentPosition(e=>{w(t,{latitude:e.coords.latitude,longitude:e.coords.longitude})},()=>{w(t)})}),document.getElementById(`cta-ready`)?.addEventListener(`click`,()=>{let e=document.getElementById(`cta-ready`);e.classList.add(`success`),e.innerHTML=`🎉 บันทึกแล้ว! พร้อมไปติดต่อ`,e.style.pointerEvents=`none`,setTimeout(()=>{n(`/chat`,{serviceId:t.id,autoMessage:`ฉันเตรียมเอกสารเรียบร้อยแล้ว มีอะไรที่ต้องรู้เพิ่มเติมไหม?`})},1500)}),E(t)}function E(e){let t=(e.documents?.length||0)+(e.preparation?.length||0),n=[...document.querySelectorAll(`.checklist-item.checked`)].length,r=document.getElementById(`cta-ready`);r&&!r.classList.contains(`success`)&&(n===t&&t>0?(r.innerHTML=`🎉 เตรียมครบแล้ว! ไปต่อเลย`,r.classList.add(`success`)):r.innerHTML=`✅ ฉันเตรียมพร้อมแล้ว (${n}/${t})`)}function D(e={}){f.currentPage=`chat`;let t=e.serviceId,r=e.agencyId,i=t?u(t):null,a=r?l(r):null,o=`สวัสดีค่ะ! 😊 ยินดีต้อนรับสู่ GovBuddy AI
 
 ฉันช่วยเตรียมตัวก่อนไปติดต่อหน่วยงานรัฐได้ค่ะ บอกมาเลยว่าต้องการทำอะไร?`,s=[`อยากทำใบขับขี่ใหม่`,`ต้องเตรียมเอกสารอะไรบ้าง?`,`อยากไปโรงพยาบาล`,`ค่าใช้จ่ายเท่าไหร่?`];i?(o=`สวัสดีค่ะ! 😊 คุณกำลังดูเรื่อง "${i.name}"\n\nมีอะไรอยากถามเพิ่มเติมไหมคะ? ฉันช่วยได้เลย!`,s=[`ต้องเตรียมเอกสารอะไรบ้าง?`,`ค่าใช้จ่ายทั้งหมดเท่าไหร่?`,`จองคิวล่วงหน้าได้ไหม?`,`มีอะไรต้องระวังบ้าง?`]):a&&(o=`สวัสดีค่ะ! 😊 คุณสนใจบริการจาก "${a.name}"\n\nบอกมาเลยว่าต้องการทำอะไรคะ?`),e.autoMessage&&(s=[]),h.innerHTML=`
     <div class="page chat-page" id="page-chat">
