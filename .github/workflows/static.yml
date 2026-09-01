@@ -31,13 +31,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # 1. ติดตั้ง Node.js เพื่อให้รันคำสั่ง npm ได้
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 2. ติดตั้ง Dependencies ของโปรเจกต์
+      - name: Install dependencies
+        run: npm ci
+
+      # 3. สั่ง Build โปรเจกต์เพื่อสร้างโฟลเดอร์ dist
+      - name: Build project
+        run: npm run build
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
+          # อัปโหลดเฉพาะโฟลเดอร์ dist ที่สร้างขึ้นจากการ Build
           path: './dist'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
