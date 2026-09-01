@@ -2,19 +2,24 @@
 // GovBuddy AI — Main Application
 // ============================================
 import './style.css';
-import { registerRoute, navigate, initRouter } from './router.js';
+import { registerRoute, navigate, initRouter, onBeforeNavigate } from './router.js';
 import { categories, agencies, getAgencyById, getServicesByAgency, getServiceById } from './data.js';
 
 // ---- State ----
 const state = {
   currentPage: 'home',
   checkedItems: JSON.parse(localStorage.getItem('govbuddy-checked') || '{}'),
+  journeys: JSON.parse(localStorage.getItem('govbuddy-journeys') || '{}'),
   chatHistory: [],
   guidedAnswers: {},
 };
 
 function saveChecked() {
   localStorage.setItem('govbuddy-checked', JSON.stringify(state.checkedItems));
+}
+
+function saveJourneys() {
+  localStorage.setItem('govbuddy-journeys', JSON.stringify(state.journeys));
 }
 
 // ---- Icons (SVG inline) ----
@@ -78,8 +83,34 @@ function bindNavEvents() {
 // ============================================
 // Screen 1: Home — Explore & Select
 // ============================================
+const SEARCH_HINTS = [
+  { text: 'ไปโรงพยาบาลครั้งแรก', keywords: ['โรงพยาบาล', 'ครั้งแรก', 'ทำบัตร'], serviceId: 'hospital-new-patient' },
+  { text: 'ทำใบขับขี่มอไซ', keywords: ['มอไซ', 'จักรยานยนต์', 'ใบขับขี่'], serviceId: 'dlt-new-license' },
+  { text: 'ต่ออายุใบขับขี่หมดแล้ว', keywords: ['ต่ออายุ', 'หมดอายุ'], serviceId: 'dlt-renew-license' },
+  { text: 'โอนรถให้คนอื่น', keywords: ['โอน', 'กรรมสิทธิ์'], serviceId: 'dlt-transfer' },
+  { text: 'ขอใบรับรองแพทย์', keywords: ['ใบรับรอง', 'แพทย์'], serviceId: 'hospital-medical-cert' },
+  { text: 'รถเกิน 7 ปี ต้องตรวจไหม', keywords: ['7 ปี', 'ตรวจสภาพ', 'ตรอ'], serviceId: 'dlt-vehicle-reg' },
+  { text: 'ใช้สิทธิ์บัตรทองยังไง', keywords: ['บัตรทอง', 'สิทธิ์', 'เบิก'], serviceId: 'hospital-claim-rights' },
+  { text: 'จองคิวขนส่งยังไง', keywords: ['จองคิว', 'smart queue', 'ขนส่ง'], agencyId: 'dlt' },
+  { text: 'ทำบัตรโรงพยาบาลใหม่', keywords: ['บัตรโรงพยาบาล', 'HN'], serviceId: 'hospital-new-patient' },
+  { text: 'เปลี่ยนใบขับขี่เป็นรถยนต์', keywords: ['เปลี่ยนชนิด', 'รถยนต์'], serviceId: 'dlt-change-license' },
+];
+
+let hintTimer = null;
+let hintIndex = 0;
+
+function stopHintRotation() {
+  if (hintTimer) {
+    clearInterval(hintTimer);
+    hintTimer = null;
+  }
+}
+
+onBeforeNavigate(stopHintRotation);
+
 function renderHome() {
   state.currentPage = 'home';
+  stopHintRotation();
 
   app.innerHTML = `
     <div class="page" id="page-home">
@@ -98,35 +129,14 @@ function renderHome() {
         <!-- Search -->
         <div class="search-bar" id="search-bar">
           <span class="search-bar-icon">${icons.search}</span>
-          <input type="text" placeholder="ค้นหาหน่วยงาน หรือบริการที่ต้องการ" id="search-input" />
+          <input type="text" placeholder="พิมพ์เป็นภาษาพูดได้ เช่น ไปหาหมอครั้งแรก" id="search-input" />
         </div>
+        <div class="search-hints" id="search-hints"></div>
       </header>
 
       <div class="page-content">
         <!-- Search Results (hidden by default) -->
         <div id="search-results" class="hidden" style="margin-bottom: var(--space-6);"></div>
-
-        <div class="onboarding-card">
-          <div class="onboarding-header">
-            <div class="onboarding-label">เริ่มจากเรื่องที่คุณต้องทำ</div>
-            <button class="text-button" id="home-quick-ai">ช่วยแนะนำ</button>
-          </div>
-          <div class="quick-goal-list">
-            <button class="quick-goal-item" data-purpose="dlt-new-license">
-              <span class="quick-goal-icon">🪪</span>
-              <span>ทำใบขับขี่ใหม่</span>
-            </button>
-            <button class="quick-goal-item" data-purpose="dlt-renew-license">
-              <span class="quick-goal-icon">🔄</span>
-              <span>ต่ออายุใบขับขี่</span>
-            </button>
-            <button class="quick-goal-item" data-purpose="hospital">
-              <span class="quick-goal-icon">🏥</span>
-              <span>ไปโรงพยาบาล</span>
-            </button>
-          </div>
-          <button class="cta-button" id="start-journey-btn">เริ่มทำเรื่อง</button>
-        </div>
 
         <!-- Categories -->
         <div id="categories-section">
@@ -167,10 +177,10 @@ function renderHome() {
         </div>
 
         <!-- Quick AI Help -->
-        <div style="margin-top: var(--space-6); padding: var(--space-4); background: linear-gradient(135deg, var(--color-accent-light), var(--color-primary-light)); border-radius: var(--radius-lg); text-align: center;">
+        <div id="home-ai-help" style="margin-top: var(--space-6); padding: var(--space-4); background: linear-gradient(135deg, var(--color-accent-light), var(--color-primary-light)); border-radius: var(--radius-lg); text-align: center;">
           <div style="font-size: 28px; margin-bottom: var(--space-2);">🤖</div>
           <div style="font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-primary); margin-bottom: var(--space-1);">ไม่แน่ใจต้องทำอะไร?</div>
-          <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-3);">บอก AI ว่าคุณต้องการทำอะไร แล้วเราจะช่วยแนะนำ</div>
+          <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-3);">บอก AI เป็นภาษาพูดได้เลย แล้วจะชี้ทางทีละขั้น</div>
           <button class="cta-button" id="home-ai-btn" style="max-width: 240px; margin: 0 auto; font-size: var(--font-size-base); padding: var(--space-3) var(--space-5);">
             ${icons.sparkle} เริ่มคุยกับ AI
           </button>
@@ -204,46 +214,43 @@ function renderHome() {
   // Chat buttons
   document.getElementById('home-chat-btn')?.addEventListener('click', () => navigate('/chat'));
   document.getElementById('home-ai-btn')?.addEventListener('click', () => navigate('/chat'));
-  document.getElementById('home-quick-ai')?.addEventListener('click', () => navigate('/chat'));
-  document.querySelectorAll('.quick-goal-item').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const purpose = btn.dataset.purpose;
-      if (purpose === 'hospital') {
-        navigate('/agency', { agencyId: 'hospital' });
-      } else {
-        navigate('/service', { serviceId: purpose });
-      }
-    });
-  });
-  document.getElementById('start-journey-btn')?.addEventListener('click', () => {
-    const firstAgency = agencies[0];
-    if (firstAgency) {
-      navigate('/agency', { agencyId: firstAgency.id });
-    } else {
-      navigate('/chat');
-    }
-  });
 
   // Search
   const searchInput = document.getElementById('search-input');
   const searchResults = document.getElementById('search-results');
+  const searchHints = document.getElementById('search-hints');
   const categoriesSection = document.getElementById('categories-section');
   const agenciesSection = document.getElementById('agencies-section');
+  const aiHelpSection = document.getElementById('home-ai-help');
 
-  searchInput?.addEventListener('input', (e) => {
-    const query = e.target.value.trim();
+  function setBrowseVisible(visible) {
+    [searchHints, categoriesSection, agenciesSection, aiHelpSection].forEach((el) => {
+      if (!el) return;
+      el.classList.toggle('hidden', !visible);
+    });
+    searchResults.classList.toggle('hidden', visible);
+  }
+
+  function bindSearchResultClicks() {
+    searchResults.querySelectorAll('.agency-card').forEach(card => {
+      card.addEventListener('click', () => navigate('/agency', { agencyId: card.dataset.agency }));
+    });
+    searchResults.querySelectorAll('.service-card').forEach(card => {
+      card.addEventListener('click', () => navigate('/service', { serviceId: card.dataset.service }));
+    });
+  }
+
+  function runHomeSearch(rawQuery) {
+    const query = rawQuery.trim();
+    searchInput.value = query;
+
     if (query.length === 0) {
-      searchResults.classList.add('hidden');
-      categoriesSection.classList.remove('hidden');
-      agenciesSection.classList.remove('hidden');
+      setBrowseVisible(true);
       return;
     }
 
-    categoriesSection.classList.add('hidden');
-    agenciesSection.classList.add('hidden');
-    searchResults.classList.remove('hidden');
+    setBrowseVisible(false);
 
-    // Search agencies and services
     const matchedAgencies = agencies.filter(a =>
       a.name.includes(query) || a.shortName.includes(query) || a.description.includes(query)
     );
@@ -252,6 +259,20 @@ function renderHome() {
     const matchedServices = allServices.filter(s =>
       s.name.includes(query) || s.description.includes(query)
     );
+
+    SEARCH_HINTS.forEach((hint) => {
+      const hit = hint.text.includes(query) || query.includes(hint.text) ||
+        hint.keywords.some((k) => query.includes(k) || k.includes(query));
+      if (!hit) return;
+      if (hint.agencyId && !matchedAgencies.some((a) => a.id === hint.agencyId)) {
+        const agency = agencies.find((a) => a.id === hint.agencyId);
+        if (agency) matchedAgencies.push(agency);
+      }
+      if (hint.serviceId && !matchedServices.some((s) => s.id === hint.serviceId)) {
+        const service = allServices.find((s) => s.id === hint.serviceId);
+        if (service) matchedServices.push(service);
+      }
+    });
 
     let html = '';
     if (matchedAgencies.length > 0) {
@@ -293,20 +314,40 @@ function renderHome() {
         <div class="empty-state">
           <div class="empty-state-icon">🔍</div>
           <div class="empty-state-title">ไม่พบผลลัพธ์</div>
-          <div class="empty-state-desc">ลองค้นหาด้วยคำอื่น หรือถาม AI ช่วยได้เลย</div>
+          <div class="empty-state-desc">ลองพิมพ์เป็นภาษาพูด เช่น ไปโรงพยาบาลครั้งแรก หรือถาม AI ช่วยได้เลย</div>
         </div>
       `;
     }
 
     searchResults.innerHTML = html;
+    bindSearchResultClicks();
+  }
 
-    // Bind search result clicks
-    searchResults.querySelectorAll('.agency-card').forEach(card => {
-      card.addEventListener('click', () => navigate('/agency', { agencyId: card.dataset.agency }));
-    });
-    searchResults.querySelectorAll('.service-card').forEach(card => {
-      card.addEventListener('click', () => navigate('/service', { serviceId: card.dataset.service }));
-    });
+  function paintHints() {
+    const hints = [];
+    for (let i = 0; i < 3; i++) {
+      hints.push(SEARCH_HINTS[(hintIndex + i) % SEARCH_HINTS.length]);
+    }
+    searchHints.classList.add('is-fading');
+    window.setTimeout(() => {
+      searchHints.innerHTML = hints.map((hint) => (
+        `<button type="button" class="search-hint-chip" data-hint="${hint.text}">${hint.text}</button>`
+      )).join('');
+      searchHints.querySelectorAll('.search-hint-chip').forEach((chip) => {
+        chip.addEventListener('click', () => runHomeSearch(chip.dataset.hint));
+      });
+      searchHints.classList.remove('is-fading');
+    }, 180);
+  }
+
+  paintHints();
+  hintTimer = window.setInterval(() => {
+    hintIndex = (hintIndex + 3) % SEARCH_HINTS.length;
+    paintHints();
+  }, 4500);
+
+  searchInput?.addEventListener('input', (e) => {
+    runHomeSearch(e.target.value);
   });
 }
 
@@ -493,36 +534,79 @@ function showGuidedQuestions(serviceId) {
 
 
 // ============================================
-// Screen 3: Service Detail — Checklist & Action Plan
+// Screen 3: Service Detail — Step-by-step journey
 // ============================================
-function getJourneyProgress(service) {
-  const steps = [
-    { key: 'prepare', label: 'เตรียมเอกสาร' },
-    { key: 'verify', label: 'ตรวจสอบ' },
-    { key: 'travel', label: 'เดินทาง' },
-    { key: 'queue', label: 'รอคิว' },
-    { key: 'service', label: 'รับบริการ' },
-    { key: 'done', label: 'เสร็จสิ้น' },
-  ];
+const JOURNEY_STEPS = [
+  { key: 'prepare', label: 'เตรียมเอกสาร', hint: 'ติ๊กรายการเอกสารและการเตรียมตัวให้ครบก่อนไปขั้นถัดไป' },
+  { key: 'verify', label: 'ตรวจสอบ', hint: 'อัปโหลดรูปเอกสารอย่างน้อย 1 ใบ เพื่อประเมินความพร้อม' },
+  { key: 'travel', label: 'เดินทาง', hint: 'เลือกจุดบริการที่จะไปก่อน แล้วค่อยไปขั้นรอคิว' },
+  { key: 'queue', label: 'รอคิว', hint: 'จองคิวหรือยืนยันว่าเข้าใจเวลาทำการแล้ว' },
+  { key: 'service', label: 'รับบริการ', hint: 'อ่านขั้นตอนและประโยคที่ควรแจ้งเจ้าหน้าที่' },
+  { key: 'done', label: 'เสร็จสิ้น', hint: 'เตรียมครบทุกขั้นแล้ว พร้อมออกไปติดต่อ' },
+];
 
-  const checkedDocs = service.documents.filter((_, idx) => state.checkedItems[`${service.id}-doc-${idx}`]).length;
-  const checkedPrep = service.preparation.filter((_, idx) => state.checkedItems[`${service.id}-prep-${idx}`]).length;
-  const totalChecklist = service.documents.length + service.preparation.length;
-  const readiness = totalChecklist ? ((checkedDocs + checkedPrep) / totalChecklist) * 100 : 0;
-
-  let currentIndex = 0;
-  if (readiness >= 100) currentIndex = 5;
-  else if (readiness >= 75) currentIndex = 4;
-  else if (readiness >= 50) currentIndex = 3;
-  else if (readiness >= 25) currentIndex = 2;
-  else if (readiness >= 10) currentIndex = 1;
-
+function defaultJourneyState() {
   return {
-    steps,
-    currentIndex,
-    progress: ((currentIndex + 1) / steps.length) * 100,
-    statusText: currentIndex >= 4 ? 'พร้อมออกเดินทาง' : currentIndex >= 2 ? 'กำลังเตรียมตัว' : 'เริ่มต้น',
+    currentStep: 0,
+    unlockedStep: 0,
+    scanPassed: false,
+    scanHtml: '',
+    scanTone: '',
+    selectedLocationIndex: null,
+    queueConfirmed: false,
+    serviceConfirmed: false,
+    completed: false,
   };
+}
+
+function getJourneyState(serviceId) {
+  if (!state.journeys[serviceId]) {
+    state.journeys[serviceId] = defaultJourneyState();
+  }
+  return state.journeys[serviceId];
+}
+
+function getChecklistCounts(service) {
+  const docs = service.documents || [];
+  const prep = service.preparation || [];
+  const checkedDocs = docs.filter((_, idx) => state.checkedItems[`${service.id}-doc-${idx}`]).length;
+  const checkedPrep = prep.filter((_, idx) => state.checkedItems[`${service.id}-prep-${idx}`]).length;
+  return {
+    checked: checkedDocs + checkedPrep,
+    total: docs.length + prep.length,
+  };
+}
+
+function isJourneyStepComplete(service, journey, stepIndex) {
+  const key = JOURNEY_STEPS[stepIndex]?.key;
+  if (key === 'prepare') {
+    const counts = getChecklistCounts(service);
+    return counts.total === 0 || counts.checked === counts.total;
+  }
+  if (key === 'verify') return !!journey.scanPassed;
+  if (key === 'travel') return journey.selectedLocationIndex !== null && journey.selectedLocationIndex !== undefined;
+  if (key === 'queue') return !!journey.queueConfirmed;
+  if (key === 'service') return !!journey.serviceConfirmed;
+  if (key === 'done') return true;
+  return false;
+}
+
+function getCtaLabel(service, journey, stepIndex) {
+  const key = JOURNEY_STEPS[stepIndex]?.key;
+  const complete = isJourneyStepComplete(service, journey, stepIndex);
+  if (key === 'done') return 'กลับหน้าแรก';
+  if (!complete) {
+    if (key === 'prepare') {
+      const counts = getChecklistCounts(service);
+      return `ติ๊กให้ครบก่อนไปต่อ (${counts.checked}/${counts.total})`;
+    }
+    if (key === 'verify') return 'อัปโหลดเอกสารก่อนไปต่อ';
+    if (key === 'travel') return 'เลือกจุดบริการก่อนไปต่อ';
+    if (key === 'queue') return 'ยืนยันคิวหรือเวลาทำการก่อนไปต่อ';
+    if (key === 'service') return 'อ่านและยืนยันก่อนไปต่อ';
+  }
+  if (stepIndex === JOURNEY_STEPS.length - 2) return 'ไปขั้นสุดท้าย';
+  return `ไปขั้นถัดไป · ${JOURNEY_STEPS[stepIndex + 1].label}`;
 }
 
 function getNearestLocations(service) {
@@ -610,7 +694,7 @@ function updateNearestLocations(service, userCoords = null) {
   listEl.innerHTML = locations
     .slice(0, 3)
     .map((loc, index) => `
-      <div class="gps-item ${index === 0 ? 'recommended' : ''}">
+      <div class="gps-item ${index === 0 ? 'recommended' : ''}" data-loc="${index}">
         <div class="gps-item-rank">${index === 0 ? 'แนะนำ' : index + 1}</div>
         <div class="gps-item-content">
           <div class="gps-item-name">${loc.name}</div>
@@ -622,22 +706,293 @@ function updateNearestLocations(service, userCoords = null) {
     .join('');
 }
 
+function renderConfirmRow({ id, checked, title, hint }) {
+  return `
+    <label class="confirm-row ${checked ? 'is-checked' : ''}">
+      <input type="checkbox" id="${id}" class="confirm-input" ${checked ? 'checked' : ''} />
+      <span class="confirm-box" aria-hidden="true">${icons.check}</span>
+      <span class="confirm-copy">
+        <span class="confirm-title">${title}</span>
+        <span class="confirm-hint">${hint}</span>
+      </span>
+    </label>
+  `;
+}
+
+function getDocumentSample(name = '') {
+  const rules = [
+    { test: /ประชาชน/, file: 'id-card.svg' },
+    { test: /ใบขับขี่/, file: 'driving-license.svg' },
+    { test: /ใบรับรองแพทย์/, file: 'medical-cert.svg' },
+    { test: /รูปถ่าย/, file: 'photo-1inch.svg' },
+    { test: /คู่มือจดทะเบียน|สมุด/, file: 'vehicle-book.svg' },
+    { test: /พ\.ร\.บ/, file: 'prb.svg' },
+    { test: /ตรวจสภาพ|ตรอ/, file: 'inspection.svg' },
+    { test: /สัญญาซื้อขาย/, file: 'contract.svg' },
+    { test: /มอบอำนาจ/, file: 'poa.svg' },
+    { test: /สิทธิ์การรักษา|บัตรทอง/, file: 'health-card.svg' },
+    { test: /ส่งตัว|Referral/, file: 'referral.svg' },
+    { test: /ยา/, file: 'medicine.svg' },
+    { test: /HN/, file: 'hn-card.svg' },
+  ];
+  const match = rules.find((rule) => rule.test.test(name));
+  if (!match) return null;
+  return {
+    src: `${import.meta.env.BASE_URL}samples/${match.file}`,
+    title: name,
+  };
+}
+
+function openSamplePreview(src, title) {
+  document.querySelector('.sample-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'sample-overlay';
+  overlay.innerHTML = `
+    <div class="sample-sheet">
+      <div class="sample-sheet-top">
+        <div>
+          <div class="sample-sheet-kicker">ภาพตัวอย่าง</div>
+          <div class="sample-sheet-title">${title}</div>
+        </div>
+        <button type="button" class="sample-close" id="sample-close">${icons.close}</button>
+      </div>
+      <img class="sample-image" src="${src}" alt="ตัวอย่าง ${title}" />
+      <p class="sample-caption">นี่คือภาพจำลองเพื่อให้รู้ว่าเอกสารหน้าตาประมาณไหน ไม่ใช่เอกสารจริง และไม่มีข้อมูลบุคคล</p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+  overlay.querySelector('#sample-close')?.addEventListener('click', close);
+}
+
+function renderChecklistItems(items, prefix, serviceId) {
+  return items.map((item, i) => {
+    const itemKey = `${serviceId}-${prefix}-${i}`;
+    const isChecked = state.checkedItems[itemKey];
+    const sample = prefix === 'doc' ? getDocumentSample(item.name) : null;
+    return `
+      <div class="checklist-item ${isChecked ? 'checked' : ''}" data-key="${itemKey}">
+        <div class="checklist-checkbox">${icons.check}</div>
+        <div class="checklist-item-content">
+          <div class="checklist-item-name">${item.name}</div>
+          ${item.note ? `<div class="checklist-item-note">${item.note}</div>` : ''}
+          ${item.isConditional ? `<div class="checklist-item-conditional">⚠️ ${item.condition || 'มีเงื่อนไข'}</div>` : ''}
+          ${item.link ? `<a href="${item.link}" target="_blank" class="checklist-link">${icons.link} เปิดลิงก์</a>` : ''}
+        </div>
+        ${sample ? `
+          <button type="button" class="doc-sample" data-src="${sample.src}" data-title="${sample.title}" aria-label="ดูตัวอย่าง ${item.name}">
+            <img src="${sample.src}" alt="" />
+            <span>ตัวอย่าง</span>
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderStepBody(service, agency, journey, stepKey) {
+  const locationList = getNearestLocations(service);
+  const now = new Date();
+  const isOpen = now.getDay() >= 1 && now.getDay() <= 5 && now.getHours() >= 8 && now.getHours() < 16;
+  const selectedLoc = locationList[journey.selectedLocationIndex];
+
+  if (stepKey === 'prepare') {
+    return `
+      <div class="step-intro">
+        <p>เตรียมของให้ครบก่อนออกจากบ้าน ติ๊กทีละรายการได้เลย กดรูปตัวอย่างถ้ายังไม่แน่ใจว่าเอกสารหน้าตาเป็นยังไง</p>
+      </div>
+      <div class="meta-chip-row">
+        <div class="meta-chip">📍 ${service.location}</div>
+        <div class="meta-chip">💰 ${service.estimatedCost}</div>
+        <div class="meta-chip">⏱ ${service.estimatedTime}</div>
+      </div>
+      <div class="checklist-section">
+        <div class="checklist-section-title">
+          <span class="checklist-section-number">1</span>
+          เอกสารที่ต้องเตรียม
+        </div>
+        <div class="checklist-items">${renderChecklistItems(service.documents, 'doc', service.id)}</div>
+      </div>
+      ${service.preparation?.length ? `
+        <div class="checklist-section">
+          <div class="checklist-section-title">
+            <span class="checklist-section-number">2</span>
+            การเตรียมตัวล่วงหน้า
+          </div>
+          <div class="checklist-items">${renderChecklistItems(service.preparation, 'prep', service.id)}</div>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  if (stepKey === 'verify') {
+    return `
+      <div class="step-intro">
+        <p>อัปโหลดรูปเอกสารที่เตรียมไว้ ระบบจะช่วยดูคร่าว ๆ ว่าพร้อมยื่นหรือยัง</p>
+      </div>
+      <div class="utility-card document-card">
+        <div class="utility-card-header">
+          <div>
+            <div class="utility-card-title">ตรวจสอบเอกสาร</div>
+            <div class="utility-card-subtitle">ถ่ายหรืออัปโหลดรูปอย่างน้อย 1 ใบ</div>
+          </div>
+          <div class="utility-chip">AI Scan</div>
+        </div>
+        <input type="file" id="doc-scan-input" accept="image/*" capture="environment" class="hidden" />
+        <button id="doc-scan-btn" class="scan-button">📷 ถ่าย/อัปโหลดเอกสาร</button>
+        <div id="scan-result" class="scan-result ${journey.scanTone || ''}">
+          ${journey.scanHtml || 'ยังไม่มีการสแกนเอกสาร กรุณาอัปโหลดรูปภาพเพื่อประเมินความพร้อม'}
+        </div>
+      </div>
+    `;
+  }
+
+  if (stepKey === 'travel') {
+    return `
+      <div class="step-intro">
+        <p>เลือกจุดที่จะไปก่อน อย่าเพิ่งกังวลเรื่องคิว — ขั้นถัดไปจะให้จองคิว</p>
+      </div>
+      <div class="utility-card gps-card">
+        <div class="utility-card-header">
+          <div>
+            <div class="utility-card-title">จุดที่ควรไป</div>
+            <div class="utility-card-subtitle">แตะเพื่อเลือกสาขาหรือหน่วยงาน</div>
+          </div>
+          <button id="gps-locate-btn" class="ghost-button">📍 ตำแหน่งของฉัน</button>
+        </div>
+        <div id="gps-locations" class="gps-list">
+          ${locationList.slice(0, 3).map((loc, index) => `
+            <div class="gps-item ${index === 0 ? 'recommended' : ''} ${journey.selectedLocationIndex === index ? 'selected' : ''}" data-loc="${index}">
+              <div class="gps-item-rank">${index === 0 ? 'แนะนำ' : index + 1}</div>
+              <div class="gps-item-content">
+                <div class="gps-item-name">${loc.name}</div>
+                <div class="gps-item-address">${loc.address}</div>
+              </div>
+              <div class="gps-item-distance">${loc.distance || '5–15 กม.'}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  if (stepKey === 'queue') {
+    const queue = agency?.queueSystem;
+    return `
+      <div class="step-intro">
+        <p>จองคิวหรือเช็กเวลาทำการก่อนเดินทาง จะได้ไม่ไปแล้วเจอปิด</p>
+      </div>
+      <div class="utility-card">
+        <div class="utility-card-header">
+          <div>
+            <div class="utility-card-title">${selectedLoc?.name || service.location}</div>
+            <div class="utility-card-subtitle">${service.operatingHours}</div>
+          </div>
+          <span class="status-pill ${isOpen ? '' : 'pill-closed'}">${isOpen ? 'เปิดอยู่' : 'ปิดแล้ว'}</span>
+        </div>
+        ${queue?.url ? `
+          <a href="${queue.url}" target="_blank" class="scan-button queue-link">${icons.link} จองคิวผ่าน ${queue.name}</a>
+        ` : `
+          <div class="scan-result">หน่วยงานนี้อาจไม่มีคิวออนไลน์ แนะนำโทรสอบถามหรือไปเช้า</div>
+        `}
+        ${renderConfirmRow({
+          id: 'queue-confirm',
+          checked: journey.queueConfirmed,
+          title: 'ฉันจองคิวแล้ว หรือเข้าใจเวลาทำการแล้ว',
+          hint: 'แตะช่องสี่เหลี่ยมเพื่อติ๊กยืนยัน',
+        })}
+      </div>
+    `;
+  }
+
+  if (stepKey === 'service') {
+    const scripts = service.officerScripts || [
+      `แจ้งจุดรับเรื่อง: "มาติดต่อขอรับบริการ ${service.name}"`,
+      `ยื่นเอกสาร: "ยื่นบัตรประชาชนและเอกสารตามเช็คลิสต์ที่เตรียมไว้"`,
+    ];
+    return `
+      <div class="step-intro">
+        <p>เมื่อถึงเคาน์เตอร์ ทำตามลำดับนี้ และใช้ประโยคด้านล่างได้เลย</p>
+      </div>
+      <div class="checklist-section">
+        <div class="checklist-section-title">ขั้นตอน ณ จุดบริการ</div>
+        <div class="process-list">
+          ${service.steps.map((step, i) => `
+            <div class="process-item">
+              <div class="process-num">${i + 1}</div>
+              <div>${step}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="tips-section" style="background: var(--color-primary-50); border: 1px dashed var(--color-accent);">
+        <div class="tips-title" style="color: var(--color-primary);">🗣️ สิ่งที่ควรแจ้งเจ้าหน้าที่</div>
+        <div class="tips-list">
+          ${scripts.map(script => `<div class="tip-item" style="color: var(--color-text);">${script}</div>`).join('')}
+        </div>
+      </div>
+      ${renderConfirmRow({
+        id: 'service-confirm',
+        checked: journey.serviceConfirmed,
+        title: 'ฉันอ่านขั้นตอนและพร้อมแจ้งเจ้าหน้าที่แล้ว',
+        hint: 'แตะช่องสี่เหลี่ยมเพื่อติ๊กยืนยัน',
+      })}
+    `;
+  }
+
+  const counts = getChecklistCounts(service);
+  return `
+    <div class="done-card">
+      <div class="done-emoji">🎉</div>
+      <h2>เตรียมครบแล้ว</h2>
+      <p>พร้อมไปติดต่อเรื่อง “${service.name}”</p>
+      <ul class="done-summary">
+        <li>เอกสาร ${counts.checked}/${counts.total} รายการ</li>
+        <li>จุดบริการ: ${selectedLoc?.name || service.location}</li>
+        <li>เวลาโดยประมาณ: ${service.estimatedTime}</li>
+      </ul>
+    </div>
+    <div class="tips-section">
+      <div class="tips-title">💡 ก่อนออกจากบ้าน</div>
+      <div class="tips-list">
+        ${(service.tips || []).slice(0, 3).map(tip => `<div class="tip-item">${tip}</div>`).join('')}
+      </div>
+    </div>
+    <div class="done-actions">
+      <button class="ghost-button done-chat-btn" id="done-chat-btn">${icons.sparkle} ถาม AI เพิ่มเติม</button>
+    </div>
+    <div class="source-block">
+      <div class="source-label">📌 แหล่งข้อมูล</div>
+      ${service.sources.map(src => `
+        <a href="${src.url}" target="_blank" class="chat-source">
+          <span class="chat-source-icon">${icons.link}</span>
+          ${src.title}
+        </a>
+      `).join('')}
+    </div>
+  `;
+}
+
 function renderServiceDetail(params) {
   state.currentPage = 'service';
   const service = getServiceById(params.serviceId);
   if (!service) return navigate('/');
 
   const agency = getAgencyById(service.agencyId);
-  const checkKey = service.id;
-  const journey = getJourneyProgress(service);
+  const journey = getJourneyState(service.id);
 
-  // Check if it's open (simple weekday check)
-  const now = new Date();
-  const hour = now.getHours();
-  const day = now.getDay();
-  const isOpen = day >= 1 && day <= 5 && hour >= 8 && hour < 16;
+  let stepIndex = JOURNEY_STEPS.findIndex((step) => step.key === params.step);
+  if (stepIndex < 0) stepIndex = journey.currentStep || 0;
+  if (stepIndex > journey.unlockedStep) stepIndex = journey.unlockedStep;
+  journey.currentStep = stepIndex;
+  saveJourneys();
 
-  const locationList = getNearestLocations(service);
+  const current = JOURNEY_STEPS[stepIndex];
+  const progress = ((stepIndex + 1) / JOURNEY_STEPS.length) * 100;
+  const complete = isJourneyStepComplete(service, journey, stepIndex);
 
   app.innerHTML = `
     <div class="page" id="page-service-detail">
@@ -648,197 +1003,37 @@ function renderServiceDetail(params) {
       </header>
 
       <div class="page-scroll">
-        <div class="detail-hero">
-          <div class="detail-hero-badge">บริการที่เลือก</div>
-          <div class="detail-hero-row">
-            <div class="detail-hero-icon">${service.icon}</div>
-            <div>
-              <h2 class="detail-hero-title">${service.name}</h2>
-              <p class="detail-hero-subtitle">${service.description}</p>
-            </div>
+        <div class="wizard-bar">
+          <div class="wizard-bar-top">
+            <span>ขั้น ${stepIndex + 1} จาก ${JOURNEY_STEPS.length}</span>
+            <span>${current.label}</span>
           </div>
-        </div>
-
-        <div class="page-content" style="margin-top: -8px;">
-          <div class="meta-chip-row">
-            <div class="meta-chip">📍 ${service.location}</div>
-            <div class="meta-chip">💰 ${service.estimatedCost}</div>
-            <div class="meta-chip">⏱ ${service.estimatedTime}</div>
+          <div class="progress-bar">
+            <div class="progress-bar-fill" style="width: ${progress}%"></div>
           </div>
-
-          <div class="service-summary-card">
-            <div class="service-summary-label">ก่อนออกไป</div>
-            <div class="service-summary-grid">
-              <div><span>1</span> ตรวจสอบเวลาและจองคิว</div>
-              <div><span>2</span> เตรียมเอกสารตามเช็กลิสต์</div>
-              <div><span>3</span> ไปถึงก่อนเวลานัด 30 นาที</div>
-            </div>
-          </div>
-
-          <div class="status-card">
-            <div class="status-header-row">
-              <div class="status-title">สถานะการเตรียมตัว</div>
-              <span class="status-pill">${journey.statusText}</span>
-            </div>
-            <div class="progress-bar" style="margin: 0; margin-top: var(--space-3);">
-              <div class="progress-bar-fill" style="width: ${journey.progress}%"></div>
-            </div>
-            <div class="journey-steps">
-              ${journey.steps.map((step, index) => `
-                <div class="journey-step ${index <= journey.currentIndex ? 'active' : ''}">
-                  <div class="journey-dot">${index + 1}</div>
-                  <span>${step.label}</span>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-
-          <div class="utility-card document-card">
-            <div class="utility-card-header">
-              <div>
-                <div class="utility-card-title">ตรวจสอบเอกสาร</div>
-                <div class="utility-card-subtitle">อัปโหลดรูปเพื่อให้ระบบประเมินความพร้อม</div>
-              </div>
-              <div class="utility-chip">AI Scan</div>
-            </div>
-            <input type="file" id="doc-scan-input" accept="image/*" capture="environment" class="hidden" />
-            <button id="doc-scan-btn" class="scan-button">📷 ถ่าย/อัปโหลดเอกสาร</button>
-            <div id="scan-result" class="scan-result">
-              ยังไม่มีการสแกนเอกสาร กรุณาอัปโหลดรูปภาพเพื่อประเมินความพร้อม
-            </div>
-          </div>
-
-          <div class="utility-card gps-card">
-            <div class="utility-card-header">
-              <div>
-                <div class="utility-card-title">จุดที่ควรไปก่อน</div>
-                <div class="utility-card-subtitle">หน่วยงานที่ใกล้และสะดวกที่สุด</div>
-              </div>
-              <button id="gps-locate-btn" class="ghost-button">📍 ตำแหน่งของฉัน</button>
-            </div>
-            <div id="gps-locations" class="gps-list">
-              ${locationList.slice(0, 2).map((loc, index) => `
-                <div class="gps-item ${index === 0 ? 'recommended' : ''}">
-                  <div class="gps-item-rank">${index === 0 ? 'แนะนำ' : index + 1}</div>
-                  <div class="gps-item-content">
-                    <div class="gps-item-name">${loc.name}</div>
-                    <div class="gps-item-address">${loc.address}</div>
-                  </div>
-                  <div class="gps-item-distance">${loc.distance || '5–15 กม.'}</div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-
-          <!-- Documents Checklist -->
-          <div class="checklist-section">
-            <div class="checklist-section-title">
-              <span class="checklist-section-number">1</span>
-              เอกสารที่ต้องเตรียม
-            </div>
-            <div class="checklist-items" id="documents-checklist">
-              ${service.documents.map((doc, i) => {
-                const itemKey = `${checkKey}-doc-${i}`;
-                const isChecked = state.checkedItems[itemKey];
-                return `
-                  <div class="checklist-item ${isChecked ? 'checked' : ''}" data-key="${itemKey}">
-                    <div class="checklist-checkbox">${icons.check}</div>
-                    <div class="checklist-item-content">
-                      <div class="checklist-item-name">${doc.name}</div>
-                      ${doc.note ? `<div class="checklist-item-note">${doc.note}</div>` : ''}
-                      ${doc.isConditional ? `<div class="checklist-item-conditional">⚠️ ${doc.condition || 'มีเงื่อนไข'}</div>` : ''}
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-
-          <!-- Preparation Checklist -->
-          ${service.preparation ? `
-            <div class="checklist-section">
-              <div class="checklist-section-title">
-                <span class="checklist-section-number">2</span>
-                การเตรียมตัวล่วงหน้า
-              </div>
-              <div class="checklist-items" id="preparation-checklist">
-                ${service.preparation.map((prep, i) => {
-                  const itemKey = `${checkKey}-prep-${i}`;
-                  const isChecked = state.checkedItems[itemKey];
-                  return `
-                    <div class="checklist-item ${isChecked ? 'checked' : ''}" data-key="${itemKey}">
-                      <div class="checklist-checkbox">${icons.check}</div>
-                      <div class="checklist-item-content">
-                        <div class="checklist-item-name">${prep.name}</div>
-                        ${prep.note ? `<div class="checklist-item-note">${prep.note}</div>` : ''}
-                        ${prep.link ? `<a href="${prep.link}" target="_blank" style="display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: var(--font-size-xs); color: var(--color-accent);">${icons.link} เปิดลิงก์</a>` : ''}
-                      </div>
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          ` : ''}
-
-          <!-- Steps -->
-          <div class="checklist-section">
-            <div class="checklist-section-title">
-              <span class="checklist-section-number">3</span>
-              ขั้นตอนการดำเนินการ
-            </div>
-            <div style="background: var(--color-surface); border-radius: var(--radius-md); border: 1px solid var(--color-border-light); overflow: hidden;">
-              ${service.steps.map((step, i) => `
-                <div style="display: flex; gap: var(--space-3); padding: var(--space-3) var(--space-4); ${i > 0 ? 'border-top: 1px solid var(--color-border-light);' : ''}">
-                  <div style="width: 24px; height: 24px; background: var(--color-primary-light); color: var(--color-primary); border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); flex-shrink: 0;">${i + 1}</div>
-                  <div style="font-size: var(--font-size-sm); color: var(--color-text); line-height: var(--line-height-relaxed); padding-top: 2px;">${step}</div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-
-          <!-- Tips -->
-          <div class="tips-section">
-            <div class="tips-title">💡 เคล็ดลับ</div>
-            <div class="tips-list">
-              ${service.tips.map(tip => `<div class="tip-item">${tip}</div>`).join('')}
-            </div>
-          </div>
-
-          <!-- Officer Scripts (Painpoint #8) -->
-          <div class="tips-section" style="background: var(--color-primary-50); border: 1px dashed var(--color-accent);">
-            <div class="tips-title" style="color: var(--color-primary);">🗣️ สิ่งที่ควรแจ้งเจ้าหน้าที่เมื่อไปถึง</div>
-            <div class="tips-list">
-              ${(service.officerScripts || [
-                `แจ้งจุดรับเรื่อง: "มาติดต่อขอรับบริการ ${service.name}"`,
-                `ยื่นเอกสาร: "ยื่นบัตรประชาชนและเอกสารตามเช็คลิสต์ที่เตรียมไว้"`,
-              ]).map(script => `
-                <div class="tip-item" style="color: var(--color-text);">
-                  ${script}
-                </div>
-              `).join('')}
-            </div>
-          </div>
-
-          <!-- Sources -->
-          <div style="margin-bottom: var(--space-8);">
-            <div style="font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-text-secondary); margin-bottom: var(--space-2);">📌 แหล่งข้อมูล</div>
-            ${service.sources.map(src => `
-              <a href="${src.url}" target="_blank" class="chat-source" style="margin-bottom: var(--space-1);">
-                <span class="chat-source-icon">${icons.link}</span>
-                ${src.title}
-              </a>
+          <div class="wizard-dots" role="list">
+            ${JOURNEY_STEPS.map((step, index) => `
+              <button
+                type="button"
+                class="wizard-dot ${index === stepIndex ? 'current' : ''} ${index < stepIndex ? 'done' : ''} ${index > journey.unlockedStep ? 'locked' : ''}"
+                data-step="${step.key}"
+                ${index > journey.unlockedStep ? 'disabled' : ''}
+                aria-label="${step.label}"
+              ></button>
             `).join('')}
           </div>
+          <p class="wizard-hint">${current.hint}</p>
+        </div>
 
-          <!-- Spacer for CTA -->
-          <div style="height: 80px;"></div>
+        <div class="page-content wizard-content">
+          ${renderStepBody(service, agency, journey, current.key)}
+          <div style="height: 88px;"></div>
         </div>
       </div>
 
-      <!-- CTA -->
       <div class="cta-container">
-        <button class="cta-button" id="cta-ready">
-          ✅ ฉันเตรียมพร้อมแล้ว
+        <button class="cta-button ${complete && current.key !== 'done' ? 'success' : ''}" id="cta-ready" ${complete ? '' : 'disabled'}>
+          ${getCtaLabel(service, journey, stepIndex)}
         </button>
       </div>
 
@@ -847,43 +1042,57 @@ function renderServiceDetail(params) {
   `;
 
   bindNavEvents();
+  bindWizardEvents(service, journey, stepIndex);
+}
 
-  // Back
+function refreshWizardCta(service, journey, stepIndex) {
+  const btn = document.getElementById('cta-ready');
+  if (!btn) return;
+  const complete = isJourneyStepComplete(service, journey, stepIndex);
+  btn.disabled = !complete;
+  btn.classList.toggle('success', complete && JOURNEY_STEPS[stepIndex].key !== 'done');
+  btn.innerHTML = getCtaLabel(service, journey, stepIndex);
+}
+
+function bindWizardEvents(service, journey, stepIndex) {
+  const current = JOURNEY_STEPS[stepIndex];
+
   document.getElementById('detail-back')?.addEventListener('click', () => {
+    if (stepIndex > 0) {
+      navigate('/service', { serviceId: service.id, step: JOURNEY_STEPS[stepIndex - 1].key });
+      return;
+    }
     navigate('/agency', { agencyId: service.agencyId });
   });
 
-  // Chat
   document.getElementById('detail-chat-btn')?.addEventListener('click', () => {
     navigate('/chat', { serviceId: service.id });
   });
 
-  // Checklist toggle
-  document.querySelectorAll('.checklist-item').forEach(item => {
+  document.querySelectorAll('.wizard-dot:not(.locked)').forEach((dot) => {
+    dot.addEventListener('click', () => {
+      navigate('/service', { serviceId: service.id, step: dot.dataset.step });
+    });
+  });
+
+  document.querySelectorAll('.checklist-item').forEach((item) => {
     item.addEventListener('click', (e) => {
-      if (e.target.closest('a')) return; // Don't toggle on link clicks
+      if (e.target.closest('a, .doc-sample')) return;
       const key = item.dataset.key;
       state.checkedItems[key] = !state.checkedItems[key];
       saveChecked();
       item.classList.toggle('checked');
-
-      // Animate checkbox
       const checkbox = item.querySelector('.checklist-checkbox');
       checkbox.style.animation = 'checkPop 0.3s ease-out';
-      setTimeout(() => checkbox.style.animation = '', 300);
+      setTimeout(() => { checkbox.style.animation = ''; }, 300);
+      refreshWizardCta(service, journey, stepIndex);
+    });
+  });
 
-      // Update journey / CTA
-      const updatedJourney = getJourneyProgress(service);
-      const progressFill = document.querySelector('.status-card .progress-bar-fill');
-      const statusPill = document.querySelector('.status-pill');
-      if (progressFill) progressFill.style.width = `${updatedJourney.progress}%`;
-      if (statusPill) statusPill.textContent = updatedJourney.statusText;
-
-      document.querySelectorAll('.journey-step').forEach((step, index) => {
-        step.classList.toggle('active', index <= updatedJourney.currentIndex);
-      });
-
-      updateCTA(service);
+  document.querySelectorAll('.doc-sample').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSamplePreview(btn.dataset.src, btn.dataset.title);
     });
   });
 
@@ -892,10 +1101,9 @@ function renderServiceDetail(params) {
   document.getElementById('doc-scan-btn')?.addEventListener('click', () => scanInput?.click());
   scanInput?.addEventListener('change', (event) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !scanResult) return;
 
-    const isImage = file.type.startsWith('image/');
-    if (!isImage) {
+    if (!file.type.startsWith('image/')) {
       scanResult.className = 'scan-result warning';
       scanResult.innerHTML = '<strong>รูปแบบไฟล์ไม่ถูกต้อง</strong><br>กรุณาอัปโหลดภาพเอกสารที่ชัดเจน';
       return;
@@ -903,58 +1111,91 @@ function renderServiceDetail(params) {
 
     const result = evaluateDocumentScan(service, file.name, file.size);
     const statusClass = result.tone === 'success' ? 'success' : result.tone === 'warning' ? 'warning' : 'neutral';
-    scanResult.className = `scan-result ${statusClass}`;
-    scanResult.innerHTML = `
+    const html = `
       <div class="scan-result-top">
         <span class="scan-pill ${result.tone}">${result.status}</span>
         <span class="scan-score">${result.score}%</span>
       </div>
       <div class="scan-result-message">${result.message}</div>
     `;
+    scanResult.className = `scan-result ${statusClass}`;
+    scanResult.innerHTML = html;
+    journey.scanPassed = true;
+    journey.scanHtml = html;
+    journey.scanTone = statusClass;
+    saveJourneys();
+    refreshWizardCta(service, journey, stepIndex);
   });
 
+  const bindLocationClicks = () => {
+    document.querySelectorAll('#gps-locations .gps-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        journey.selectedLocationIndex = Number(item.dataset.loc);
+        saveJourneys();
+        document.querySelectorAll('#gps-locations .gps-item').forEach((el) => el.classList.remove('selected'));
+        item.classList.add('selected');
+        refreshWizardCta(service, journey, stepIndex);
+      });
+    });
+  };
+  bindLocationClicks();
+
   document.getElementById('gps-locate-btn')?.addEventListener('click', () => {
+    const apply = (coords = null) => {
+      updateNearestLocations(service, coords);
+      document.querySelectorAll('#gps-locations .gps-item').forEach((item, index) => {
+        item.dataset.loc = String(index);
+        item.classList.toggle('selected', journey.selectedLocationIndex === index);
+      });
+      bindLocationClicks();
+    };
+
     if (!navigator.geolocation) {
-      updateNearestLocations(service);
+      apply();
       return;
     }
-
     navigator.geolocation.getCurrentPosition((position) => {
-      updateNearestLocations(service, {
+      apply({
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
       });
-    }, () => {
-      updateNearestLocations(service);
-    });
+    }, () => apply());
   });
 
-  // CTA
+  document.getElementById('queue-confirm')?.addEventListener('change', (e) => {
+    journey.queueConfirmed = e.target.checked;
+    e.target.closest('.confirm-row')?.classList.toggle('is-checked', e.target.checked);
+    saveJourneys();
+    refreshWizardCta(service, journey, stepIndex);
+  });
+
+  document.getElementById('service-confirm')?.addEventListener('change', (e) => {
+    journey.serviceConfirmed = e.target.checked;
+    e.target.closest('.confirm-row')?.classList.toggle('is-checked', e.target.checked);
+    saveJourneys();
+    refreshWizardCta(service, journey, stepIndex);
+  });
+
+  document.getElementById('done-chat-btn')?.addEventListener('click', () => {
+    navigate('/chat', { serviceId: service.id, autoMessage: 'ฉันเตรียมเอกสารเรียบร้อยแล้ว มีอะไรที่ต้องรู้เพิ่มเติมไหม?' });
+  });
+
   document.getElementById('cta-ready')?.addEventListener('click', () => {
-    const btn = document.getElementById('cta-ready');
-    btn.classList.add('success');
-    btn.innerHTML = '🎉 บันทึกแล้ว! พร้อมไปติดต่อ';
-    btn.style.pointerEvents = 'none';
-    setTimeout(() => {
-      navigate('/chat', { serviceId: service.id, autoMessage: 'ฉันเตรียมเอกสารเรียบร้อยแล้ว มีอะไรที่ต้องรู้เพิ่มเติมไหม?' });
-    }, 1500);
-  });
+    if (!isJourneyStepComplete(service, journey, stepIndex)) return;
 
-  updateCTA(service);
-}
-
-function updateCTA(service) {
-  const totalItems = (service.documents?.length || 0) + (service.preparation?.length || 0);
-  const checkedCount = [...document.querySelectorAll('.checklist-item.checked')].length;
-  const btn = document.getElementById('cta-ready');
-  if (btn && !btn.classList.contains('success')) {
-    if (checkedCount === totalItems && totalItems > 0) {
-      btn.innerHTML = '🎉 เตรียมครบแล้ว! ไปต่อเลย';
-      btn.classList.add('success');
-    } else {
-      btn.innerHTML = `✅ ฉันเตรียมพร้อมแล้ว (${checkedCount}/${totalItems})`;
+    if (current.key === 'done') {
+      journey.completed = true;
+      saveJourneys();
+      navigate('/');
+      return;
     }
-  }
+
+    const nextIndex = Math.min(stepIndex + 1, JOURNEY_STEPS.length - 1);
+    journey.unlockedStep = Math.max(journey.unlockedStep, nextIndex);
+    journey.currentStep = nextIndex;
+    saveJourneys();
+    navigate('/service', { serviceId: service.id, step: JOURNEY_STEPS[nextIndex].key });
+  });
 }
 
 
@@ -1281,7 +1522,7 @@ function renderSaved() {
                 <div class="service-card-icon" style="background: var(--color-primary-light); color: var(--color-primary)">${s.icon}</div>
                 <div class="service-card-info">
                   <div class="service-card-name">${s.name}</div>
-                  <div class="service-card-desc">${s.checkedCount}/${s.totalCount} รายการเตรียมแล้ว</div>
+                  <div class="service-card-desc">${s.checkedCount}/${s.totalCount} รายการ · ${JOURNEY_STEPS[getJourneyState(s.id).currentStep]?.label || 'เริ่มต้น'}</div>
                 </div>
                 <span class="service-card-arrow">${icons.chevron}</span>
               </div>
@@ -1393,7 +1634,9 @@ function renderProfile() {
   document.getElementById('clear-data')?.addEventListener('click', () => {
     if (confirm('ต้องการล้างข้อมูลทั้งหมดหรือไม่?')) {
       state.checkedItems = {};
+      state.journeys = {};
       saveChecked();
+      saveJourneys();
       renderProfile();
     }
   });

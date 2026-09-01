@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 360">
+  <rect width="280" height="360" fill="#F7F5EF"/>
+  <rect x="18" y="18" width="244" height="324" rx="8" fill="#FFFFFF" stroke="#E2DBC7"/>
+  <text x="140" y="48" text-anchor="middle" fill="#16283D" font-size="15" font-family="sans-serif" font-weight="700">C#1#-A"L</text>
+  <text x="140" y="68" text-anchor="middle" fill="#55677A" font-size="11" font-family="sans-serif">MEDICAL CERTIFICATE · SAMPLE</text>
+  <rect x="36" y="92" width="208" height="6" rx="3" fill="#EEE9DA"/>
+  <rect x="36" y="112" width="180" height="6" rx="3" fill="#EEE9DA"/>
+  <rect x="36" y="132" width="200" height="6" rx="3" fill="#EEE9DA"/>
+  <rect x="36" y="168" width="208" height="70" rx="8" fill="#F7F5EF"/>
+  <text x="140" y="208" text-anchor="middle" fill="#2F6B5E" font-size="12" font-family="sans-serif">@+!20*3+#1"7H3C15H</text>
+  <circle cx="200" cy="292" r="28" fill="none" stroke="#B5503B" stroke-width="3"/>
+  <text x="200" y="297" text-anchor="middle" fill="#B5503B" font-size="10" font-family="sans-serif">#2#01</text>
+  <text x="140" y="330" text-anchor="middle" fill="#C89B3C" font-size="16" font-family="sans-serif" font-weight="700">1'-"H2</text>
+</svg>
